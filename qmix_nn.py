@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 # Mixes Q vals from multiple agents to create joint action Q val
 class QMixNN(nn.Module):
@@ -8,7 +9,7 @@ class QMixNN(nn.Module):
         super(QMixNN, self).__init__()
 
         self.n_agents = n_agents
-        self.state_dim = torch.prod(state_shape)
+        self.state_dim = np.prod(state_shape)
         self.embed_dim = hidden_dim
 
         # weights for first hidden layer

@@ -1,0 +1,31 @@
+import pettingzoo
+from pettingzoo.utils.env import ParallelEnv
+import numpy as np
+
+class PettingZooWrapper:
+    def __init__(self, env_name, num_agents, obs_shape, state_shape, num_actions):
+        self.env = pettingzoo.load(env_name)
+        self.num_agents = num_agents
+        self.obs_shape = obs_shape
+        self.state_shape = state_shape
+        self.num_actions = num_actions
+
+        self.env.reset()
+        self.state_dim = np.prod(state_shape)
+        self.agent_ids = list(self.env.agents)
+    
+    def reset(self):
+        self.env.reset()
+        obs = {agent: self.env.observe(agent) for agent in self.env.agents}
+        return obs
+
+    def step(self, actions):
+        results = self.env.step(actions)
+        obs = {agent: self.env.observe(agent) for agent in self.env.agents}
+        rewards = [result[0] for result in results]
+        dones = [result[1] for result in results]
+        infos = [result[2] for result in results]
+        return obs, rewards, dones, infos
+
+    def render(self):
+        self.env.render()

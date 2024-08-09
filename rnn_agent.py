@@ -11,10 +11,10 @@ class RNN(nn.Module):
         self.fc1 = nn.Linear(input_shape, hidden_dim)
         #GRU as LSTM
         self.rnn = nn.GRUCell(hidden_dim, hidden_dim)
-        self.fc2 = nn.Lineat(hidden_dim, n_actions)
+        self.fc2 = nn.Linear(hidden_dim, n_actions)
 
     def init_hidden(self):
-        return self.fc1.weight.new(1, self.hidden_dim).zero()
+        return self.fc1.weight.new_zeros(1, self.hidden_dim)
     
     def forward(self, inputs, hidden_state):
         x = F.relu(self.fc1(inputs))
