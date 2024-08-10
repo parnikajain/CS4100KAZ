@@ -1,22 +1,204 @@
-import pygame
-from pettingzoo.butterfly import knights_archers_zombies_v10
+from collections import deque, namedtuple
+import random
 
-env = knights_archers_zombies_v10.env(render_mode="human")
+from pettingzoo.butterfly import knights_archers_zombies_v10
+import torch
+import numpy as np
+from torch import nn
+import torch.optim as optim
+import torch.nn.functional as F
+import math
+import matplotlib.pyplot as plt
+
+env = knights_archers_zombies_v10.env(render_mode="human", spawn_rate=20, num_archers=2, num_knights=2, max_zombies=10,
+                                      max_arrows=10, killable_knights=True, killable_archers=True, pad_observation=True,
+                                      line_death=False, max_cycles=900,
+                                      vector_state=True, use_typemasks=False, sequence_space=False)
 env.reset(seed=42)
 
-manual_policy = knights_archers_zombies_v10.ManualPolicy(env)
+Transition = namedtuple('Transition',
+                        ('state', 'action', 'next_state', 'reward', 'done'))
 
-for agent in env.agent_iter():
-    observation, reward, termination, truncation, info = env.last()
 
-    if termination or truncation:
-        action = None
-    elif agent == manual_policy.agent:
-        # get user input (controls are WASD and space)
-        action = manual_policy(observation, agent)
-    else:
-        # this is where you would insert your policy (for non-player agents)
-        action = env.action_space(agent).sample()
+class ReplayBuffer(object):
 
-    env.step(action)
-env.close()
+    def __init__(self, capacity):
+        self.memory = deque([], capacity)
+
+    def push(self, *args):
+        self.memory.append(*args)
+
+    def sample(self, batch_s):
+        return random.sample(self.memory, batch_s)
+
+    def __len__(self):
+        return len(self.memory)
+
+
+# initialize Deep Q learning network as class
+class DQN(nn.Module):
+    def __init__(self, n_dimensions, n_actions):
+        super(DQN, self).__init__()
+        flatten = n_dimensions[0] * n_dimensions[1]
+        self.layer1 = nn.Linear(flatten, 128)
+        self.layer2 = nn.Linear(128, 128)
+        self.layer3 = nn.Linear(128, n_actions)
+
+    def forward(self, x):
+        if isinstance(x, np.ndarray):
+            x = torch.tensor(x, dtype=torch.float32)
+        x = x.view(x.shape[0], -1)
+        x = F.relu(self.layer1(x))
+        x = F.relu(self.layer2(x))
+        return self.layer3(x)
+
+
+# get the number of actions for each agent
+num_agent_act = []
+
+env.reset()  # Ensure the environment is reset before starting
+
+for agent in env.agents:  # Loop over each agent
+    num_agent_act.append(env.action_space(agent).n)  # Append the number of actions
+
+print(num_agent_act)
+
+
+class AgentDQN:
+    def __init__(self, learning_rate, gamma, eps_start_val, eps_end_val, eps_decay, num_actions, observation_size):
+        self.learning_rate = learning_rate
+        self.gamma = gamma
+        self.eps_start_val = eps_start_val
+        self.eps_decay = eps_decay
+        self.eps_end_val = eps_end_val
+        # self.tau = tau
+        self.model = DQN(observation_size, num_actions)
+        self.memory = ReplayBuffer(1000)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
+        self.steps_done = 0
+
+    def select_action(self, state):
+        agent_id = env.agent_selection
+        sample = random.random()
+        eps_threshold = self.eps_end_val + (self.eps_start_val - self.eps_end_val) * \
+                        math.exp(-1. * self.steps_done / self.eps_decay)
+        self.steps_done += 1
+        if sample > eps_threshold:
+            with torch.no_grad():
+                print(self.model(state).max(1).indices.view(1, 1))
+                return self.model(state).max(1).indices.view(1, 1)
+        else:
+            return torch.tensor([[random.randrange(env.action_space(agent_id).n)]], dtype=torch.long)
+
+    def remember(self, s, a, r, new_s, d):
+        self.memory.push(s, a, r, new_s, d)
+
+    def replay(self, batch_size):
+        if len(self.memory) < batch_size:
+            return
+        minibatch = self.memory.sample(batch_size)
+        for state, action, next_state, reward, done in minibatch:
+            if not done:
+                target = reward + self.gamma * torch.max(
+                    self.model(torch.tensor(next_state, dtype=torch.float32))).item()
+                target_f = self.model(torch.tensor(state, dtype=torch.float32)).numpy()
+                target_f[action] = target
+                self.optimizer.zero_grad()
+                loss = nn.MSELoss()(torch.tensor(target_f), self.model(torch.tensor(state, dtype=torch.float32)))
+                loss.backward()
+                self.optimizer.step()
+            if self.eps_start_val > self.eps_end_val:
+                self.eps_start_val *= self.eps_decay
+
+
+# define vectorized observation space where n is num_archers + num_knights + num_swords + max_arrows + max_zombies + 1
+observation_shape = (27, 5)
+
+all_agents = ['archer_0', 'archer_1', 'knight_0', 'knight_1']
+# batch_size = 128
+# gamma = 0.99
+# eps_start_val = 0.9
+# eps_end_val = 0.05
+# eps_decay = 1000
+# tau = 0.005
+# learning_rate = 0.0001
+archer_1 = AgentDQN(learning_rate=0.0001, gamma=0.99, eps_start_val=0.9, eps_end_val=0.05, eps_decay=1000,
+                    num_actions=num_agent_act[0], observation_size=observation_shape)
+
+archer_2 = AgentDQN(learning_rate=0.0001, gamma=0.99, eps_start_val=0.9, eps_end_val=0.05, eps_decay=1000,
+                    num_actions=num_agent_act[1], observation_size=observation_shape)
+
+knight_1 = AgentDQN(learning_rate=0.0001, gamma=0.99, eps_start_val=0.9, eps_end_val=0.05, eps_decay=1000,
+                    num_actions=num_agent_act[2], observation_size=observation_shape)
+
+knight_2 = AgentDQN(learning_rate=0.0001, gamma=0.99, eps_start_val=0.9, eps_end_val=0.05, eps_decay=1000,
+                    num_actions=num_agent_act[3], observation_size=observation_shape)
+
+num_episodes = 1000
+agent_list = [archer_1, archer_2, knight_1, knight_2]
+batch_size = 50
+for ep in range(num_episodes):
+    state = env.reset()
+    total_reward = 0
+    done = False
+    for agent in agent_list:
+        observation, reward, termination, truncation, info = env.last()
+        if termination or truncation:
+            action = None
+
+        else:
+            action = agent.select_action(observation)
+            next_state, reward, done, _ = env.step(action)
+            agent.remember(state, action, reward, next_state, done)
+            state = next_state
+            total_reward += reward
+            agent.replay(batch_size)
+
+        print(f"Episode: {ep + 1}, Total Reward: {total_reward}")
+
+# for agent in env.agent_iter():
+#     observation, reward, termination, truncation, info = env.last()
+#
+#
+#
+#
+#         # this is where you would insert your policy
+#         # action = env.action_space(agent).sample()
+#
+#     env.step(action)
+# env.close()
+
+# episode_duration = []
+# def plot_durations(show_result=False):
+#     plt.figure(1)
+#     durations_t = torch.tensor(episode_durations, dtype=torch.float)
+#     if show_result:
+#         plt.title('Result')
+#     else:
+#         plt.clf()
+#         plt.title('Training...')
+#     plt.xlabel('Episode')
+#     plt.ylabel('Duration')
+#     plt.plot(durations_t.numpy())
+#     # Take 100 episode averages and plot them too
+#     if len(durations_t) >= 100:
+#         means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
+#         means = torch.cat((torch.zeros(99), means))
+#         plt.plot(means.numpy())
+#
+#     plt.pause(0.001)  # pause a bit so that plots are updated
+#     if is_ipython:
+#         if not show_result:
+#             display.display(plt.gcf())
+#             display.clear_output(wait=True)
+#         else:
+#             display.display(plt.gcf())
+#
+
+# policy_network_a1 = DQN(observation_shape, num_agent_act[0])
+# policy_network_a2 = DQN(observation_shape, num_agent_act[1])
+# policy_network_k1 = DQN(observation_shape, num_agent_act[2])
+# policy_network_k2 = DQN(observation_shape, num_agent_act[3])
+#
+# optimizer = optim.AdamW(policy_network_a1.parameters(), lr=learning_rate, amsgrad=True)
+# memory = ReplayBuffer(10000)
