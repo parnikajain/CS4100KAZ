@@ -52,16 +52,21 @@ num_agent_act = np.array([6, 6, 6, 6])
 
 
 class AgentDQN:
-    def __init__(self, learning_rate, gamma, eps_start_val, eps_end_val, eps_decay, num_actions, observation_size):
+    def __init__(self, learning_rate, gamma, eps_start_val, eps_end_val, eps_decay, num_actions, observation_size,
+                 agent_name, tau):
         self.learning_rate = learning_rate
         self.gamma = gamma
         self.eps_start_val = eps_start_val
         self.eps_decay = eps_decay
         self.eps_end_val = eps_end_val
         self.model = DQN(observation_size, num_actions)
+        self.target_net = DQN(observation_size, num_actions)
+        self.target_net.load_state_dict(self.model.state_dict())
         self.memory = ReplayBuffer(1000)
         self.optimizer = optim.Adam(self.model.parameters(), lr=learning_rate)
         self.steps_done = 0
+        self.agent_name = agent_name
+        self.tau = tau
 
     # if random returns random values between 0-5
     def select_action(self, s):
@@ -86,18 +91,29 @@ class AgentDQN:
             return
         minibatch = self.memory.sample(batch_size)
         for state, action, reward, next_state, done in minibatch:
+            target = reward
             if not done:
-                target = reward + self.gamma * torch.max(
-                    self.model(next_state))
-                target_f = self.model(state).detach().numpy()
-                target_f[action] = target
+                target += self.gamma * torch.max(self.target_net(next_state))
+                current_q_value = self.model(state)[action]
+
                 self.optimizer.zero_grad()
-                # print(self.model(state))
-                loss = nn.MSELoss()(torch.tensor(target_f), self.model(state))
+                loss = nn.MSELoss()(current_q_value, target)
                 loss.backward()
                 self.optimizer.step()
-            if self.eps_start_val > self.eps_end_val:
-                self.eps_start_val *= self.eps_decay
+
+        self.soft_update(self.model, self.target_net, self.tau)
+        return loss.item()
+
+    def soft_update(self, policy_net, target_net, tau):
+        for target_param, policy_param in zip(target_net.parameters(), policy_net.parameters()):
+            target_param.data.copy_(tau * policy_param.data + (1.0 - tau) * target_param.data)
+
+    def save_model(self, filepath):
+        torch.save(self.model.state_dict(), filepath)
+
+    def load_model(self, filepath):
+        self.model.load_state_dict(torch.load(filepath))
+        self.model.eval()
 
 
 # define vectorized observation space where n is num_archers + num_knights + num_swords + max_arrows + max_zombies + 1
@@ -105,116 +121,178 @@ observation_shape = (27, 5)
 
 all_agents = ['archer_0', 'archer_1', 'knight_0', 'knight_1']
 
-archer_1 = AgentDQN(learning_rate=0.0001, gamma=0.99, eps_start_val=0.9, eps_end_val=0.05, eps_decay=1000,
-                    num_actions=num_agent_act[0], observation_size=observation_shape)
+archer_0 = AgentDQN(learning_rate=0.0001, gamma=0.99, eps_start_val=0.9, eps_end_val=0.05, eps_decay=1000,
+                    num_actions=num_agent_act[0], observation_size=observation_shape, agent_name='archer_0', tau=0.005)
 
-archer_2 = AgentDQN(learning_rate=0.0001, gamma=0.99, eps_start_val=0.9, eps_end_val=0.05, eps_decay=1000,
-                    num_actions=num_agent_act[1], observation_size=observation_shape)
+archer_1 = AgentDQN(learning_rate=0.0001, gamma=0.99, eps_start_val=0.9, eps_end_val=0.05, eps_decay=1000,
+                    num_actions=num_agent_act[1], observation_size=observation_shape, agent_name='archer_1', tau=0.005)
+
+knight_0 = AgentDQN(learning_rate=0.0001, gamma=0.99, eps_start_val=0.9, eps_end_val=0.05, eps_decay=1000,
+                    num_actions=num_agent_act[2], observation_size=observation_shape, agent_name='knight_0', tau=0.005)
 
 knight_1 = AgentDQN(learning_rate=0.0001, gamma=0.99, eps_start_val=0.9, eps_end_val=0.05, eps_decay=1000,
-                    num_actions=num_agent_act[2], observation_size=observation_shape)
-
-knight_2 = AgentDQN(learning_rate=0.0001, gamma=0.99, eps_start_val=0.9, eps_end_val=0.05, eps_decay=1000,
-                    num_actions=num_agent_act[3], observation_size=observation_shape)
+                    num_actions=num_agent_act[3], observation_size=observation_shape, agent_name='knight_1', tau=0.005)
 
 env = knights_archers_zombies_v10.env(render_mode="human", spawn_rate=20, num_archers=2, num_knights=2, max_zombies=10,
                                       max_arrows=10, killable_knights=True, killable_archers=True, pad_observation=True,
                                       line_death=True, max_cycles=900,
                                       vector_state=True, use_typemasks=False, sequence_space=False)
 
-num_episodes = 10
-agent_list = [archer_1, archer_2, knight_1, knight_2]
-batch_size = 64
-last_observations = {agent: None for agent in agent_list}
+agent_models = {
+    'archer_0': archer_0.model,
+    'archer_1': archer_1.model,
+    'knight_0': knight_0.model,
+    'knight_1': knight_1.model
+}
 
 
-total_reward_vals = np.array([], dtype=int)
-for ep in range(num_episodes):
-    env.reset(seed=42)
-    total_reward = 0
-    done = False
-    while not done:
-        for agent in env.agent_iter():
-            if agent == 'archer_0':
-                agent = agent_list[0]
-            elif agent == 'archer_1':
-                agent = agent_list[1]
-            elif agent == 'knight_0':
-                agent = agent_list[2]
-            else:
-                agent = agent_list[3]
+def train():
+    num_episodes = 100
+    agent_list = [archer_0, archer_1, knight_0, knight_1]
+    batch_size = 64
+    total_reward_vals = np.array([], dtype=int)
+    last_observations = {agent: None for agent in agent_list}
+    loss_vals = {agent_name: [] for agent_name in ['archer_0', 'archer_1', 'knight_0', 'knight_1']}
+    for ep in range(num_episodes):
+        env.reset(seed=42)
 
-            observation, reward, termination, truncation, info = env.last()
-            done = truncation or termination
+        total_reward = 0
+        done = False
+        while not done:
+            for agent in env.agent_iter():
+                if agent == 'archer_0':
+                    agent = agent_list[0]
+                elif agent == 'archer_1':
+                    agent = agent_list[1]
+                elif agent == 'knight_0':
+                    agent = agent_list[2]
+                else:
+                    agent = agent_list[3]
+
+                observation, reward, termination, truncation, info = env.last()
+                done = truncation or termination
+                if done:
+                    action = None
+
+                else:
+                    action = agent.select_action(observation)
+
+                env.step(action)
+
+                # initially the observation step is the current state but after the next iteration
+                # it becomes the next state for the replay buffer and the previous state becomes the current
+                if last_observations[agent] is not None:
+                    agent.remember(last_observations[agent], action, reward, observation, termination)
+                    total_reward += int(reward)
+                    loss = agent.replay(batch_size)
+
+                    if loss is not None:
+                        loss_vals[agent.agent_name].append(loss)
+
+                last_observations[agent] = observation
+
             if done:
-                action = None
+                env.reset()
+                break
 
-            else:
-                action = agent.select_action(observation)
+        for agent in agent_list:
+            agent.soft_update(agent.model, agent.target_net, agent.tau)
 
-            env.step(action)
+        total_reward_vals = np.append(total_reward_vals, total_reward)
+        print(f"Episode {ep + 1} finished with total reward: {total_reward}")
 
-            # initially the observation step is the current state but after the next iteration
-            # it becomes the next state for the replay buffer and the previous state becomes the current
-            if last_observations[agent] is not None:
-                agent.remember(last_observations[agent], action, reward, observation, termination)
+    env.close()
+
+    archer_0.save_model('archer_0_model.pth')
+    archer_1.save_model('archer_1_model.pth')
+    knight_0.save_model('knight_0_model.pth')
+    knight_1.save_model('knight_1_model.pth')
+
+    return total_reward_vals, loss_vals
+
+
+def evaluate():
+    archer_0.load_model('archer_0_model.pth')
+    archer_1.load_model('archer_1_model.pth')
+    knight_0.load_model('knight_0_model.pth')
+    knight_1.load_model('knight_1_model.pth')
+
+    archer_0.model.eval()
+    archer_1.model.eval()
+    knight_0.model.eval()
+    knight_1.model.eval()
+
+    total_reward_vals = np.array([], dtype=int)
+    num_episodes = 10
+
+    for ep in range(num_episodes):
+        env.reset(seed=42)
+        total_reward = 0
+        done = False
+
+        while not done:
+            for agent_name in env.agent_iter():
+                if agent_name == 'archer_0':
+                    agent = archer_0
+                elif agent_name == 'archer_1':
+                    agent = archer_1
+                elif agent_name == 'knight_0':
+                    agent = knight_0
+                else:
+                    agent = knight_1
+
+                observation, reward, termination, truncation, info = env.last()
+                done = truncation or termination
+
+                if not done:
+                    action = agent.select_action(observation)
+                else:
+                    action = None
+
+                env.step(action)
                 total_reward += int(reward)
-                agent.replay(batch_size)
 
-            last_observations[agent] = observation
+            if done:
+                break
 
-        if done:
-            env.reset()
-            break
+    env.close()
 
-    total_reward_vals = np.append(total_reward_vals, total_reward)
-    print(total_reward_vals)
-    print(f"Episode {ep + 1} finished with total reward: {total_reward}")
+    average_reward = np.mean(total_reward_vals)
+    print(f"Average reward over {num_episodes} evaluation episodes: {average_reward}")
 
-env.close()
-# for agent in env.agent_iter():
-#     observation, reward, termination, truncation, info = env.last()
-#
-#
-#
-#
-#         # this is where you would insert your policy
-#         # action = env.action_space(agent).sample()
-#
-#     env.step(action)
-# env.close()
+    return total_reward_vals
 
-# episode_duration = []
-# def plot_durations(show_result=False):
-#     plt.figure(1)
-#     durations_t = torch.tensor(episode_durations, dtype=torch.float)
-#     if show_result:
-#         plt.title('Result')
-#     else:
-#         plt.clf()
-#         plt.title('Training...')
-#     plt.xlabel('Episode')
-#     plt.ylabel('Duration')
-#     plt.plot(durations_t.numpy())
-#     # Take 100 episode averages and plot them too
-#     if len(durations_t) >= 100:
-#         means = durations_t.unfold(0, 100, 1).mean(1).view(-1)
-#         means = torch.cat((torch.zeros(99), means))
-#         plt.plot(means.numpy())
-#
-#     plt.pause(0.001)  # pause a bit so that plots are updated
-#     if is_ipython:
-#         if not show_result:
-#             display.display(plt.gcf())
-#             display.clear_output(wait=True)
-#         else:
-#             display.display(plt.gcf())
-#
 
-# policy_network_a1 = DQN(observation_shape, num_agent_act[0])
-# policy_network_a2 = DQN(observation_shape, num_agent_act[1])
-# policy_network_k1 = DQN(observation_shape, num_agent_act[2])
-# policy_network_k2 = DQN(observation_shape, num_agent_act[3])
-#
-# optimizer = optim.AdamW(policy_network_a1.parameters(), lr=learning_rate, amsgrad=True)
-# memory = ReplayBuffer(10000)
+def plot_metrics(training_rewards, training_losses, evaluation_rewards):
+    # Plot Training Rewards
+    plt.figure(figsize=(12, 6))
+    plt.plot(training_rewards, label="Training Reward")
+    plt.xlabel("Episode")
+    plt.ylabel("Total Reward")
+    plt.title("Total Reward per Episode During Training")
+    plt.legend()
+    plt.show()
+
+    # Plot Training Loss for Each Agent
+    for agent_name, losses in training_losses.items():
+        plt.figure(figsize=(12, 6))
+        plt.plot(losses, label=f"{agent_name} Loss")
+        plt.xlabel("Step")
+        plt.ylabel("Loss")
+        plt.title(f"Loss During Training for {agent_name}")
+        plt.legend()
+        plt.show()
+
+    # Plot Evaluation Rewards
+    plt.figure(figsize=(12, 6))
+    plt.plot(evaluation_rewards, label="Evaluation Reward")
+    plt.xlabel("Episode")
+    plt.ylabel("Total Reward")
+    plt.title("Total Reward per Episode During Evaluation")
+    plt.legend()
+    plt.show()
+
+
+training_rewards, training_losses = train()
+evaluation_rewards = evaluate()
+plot_metrics(training_rewards, training_losses, evaluation_rewards)
