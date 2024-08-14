@@ -53,7 +53,7 @@ def parse_arguments_and_initialize_envs() -> Tuple[argparse.Namespace, DummyVect
     parser.add_argument('--num_knights', type=int, default=2)
     parser.add_argument('--n_step', type=int, default=1)
     parser.add_argument('--target_update', type=int, default=100)
-    parser.add_argument('--epochs', type=int, default=30)
+    parser.add_argument('--epochs', type=int, default=20)
     parser.add_argument('--steps_per_epoch', type=int, default=2000)
     parser.add_argument('--collect_per_step', type=int, default=10)
     parser.add_argument('--updates_per_collect', type=float, default=0.5)
@@ -113,7 +113,8 @@ def initialize_agents_and_envs(
 
 
 def setup_training_and_logger(args, policy, envs):
-    log_dir = os.path.join(args.log_path, 'kaz', 'dqn')
+    log_dir = os.path.join('data')
+    os.makedirs(log_dir, exist_ok=True)
     writer = SummaryWriter(log_dir)
     writer.add_text("args", str(args))
     logger = TensorboardLogger(writer)
@@ -125,7 +126,6 @@ def setup_training_and_logger(args, policy, envs):
         exploration_noise=True
     )
     return logger, collector
-
 
 def execute_training_loop(args, policy, optimizers, schedulers, logger, collector):
     rewards = []
@@ -180,7 +180,9 @@ def execute_training_loop(args, policy, optimizers, schedulers, logger, collecto
     return result
 
 
-def plot_results(rewards, losses, log_dir='log/kaz/dqn'):
+def plot_results(rewards, losses, log_dir='data'):
+    os.makedirs(log_dir, exist_ok=True)
+
     # Plot rewards
     plt.figure(figsize=(12, 6))
     plt.plot(rewards, label='Rewards')
@@ -226,7 +228,7 @@ def execute_kaz(args):
                 return
 
         print(f"Reward: {result['rews'][:, 0].mean()}, Length: {result['lens'].mean()}")
-        time.sleep(2)  # To allow you to observe the window after execution
+        time.sleep(2)
     else:
         args, envs = parse_arguments_and_initialize_envs()
         policy, optimizers, agents, schedulers = initialize_agents_and_envs(args, envs)
