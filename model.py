@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'done'))
 
-
 class ReplayBuffer(object):
 
     def __init__(self, capacity):
