@@ -1,4 +1,4 @@
-# Knights Archers Zombies (KAZ) Centralized and Decentralized Training
+# CS4100 Knights Archers Zombies (KAZ) Centralized and Decentralized Training
 
 ## Centralize Training
 
