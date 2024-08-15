@@ -7,7 +7,7 @@ Requirements
 
 To set up the environment and run the code, you need the following Python packages:
 
-```bash
+bash
 pip install gym numpy torch pygame matplotlib tianshou pettingzoo
 ```
 
