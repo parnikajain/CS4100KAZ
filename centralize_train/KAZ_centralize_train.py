@@ -18,17 +18,20 @@ from tianshou.env import DummyVectorEnv
 from tianshou.env.pettingzoo_env import PettingZooEnv
 from tianshou.policy import (
     BasePolicy,
-    DQNPolicy,
-    MultiAgentPolicyManager,
+    DQNPolicy,  # DQN Algorithm: This is the core policy used for each agent
+    MultiAgentPolicyManager,  # Multi-Agent Policy Management: This is used to manage multiple agents
 )
-from tianshou.trainer import offpolicy_trainer
+from tianshou.trainer import offpolicy_trainer  # Off-Policy Training: Used to train the agents
 from tianshou.utils import TensorboardLogger
-from tianshou.utils.net.common import Net
+from tianshou.utils.net.common import Net  # DQN Algorithm: The network used by DQN to approximate Q-values
 
 
 def setup_environment_and_seed(args, render_mode=None):
+    # Set random seeds for reproducibility
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
+
+    # Initialize multiple instances of the environment with the specified parameters
     envs = [lambda: PettingZooEnv(knights_archers_zombies_v10.env(
         max_arrows=1000,
         killable_knights=False,
@@ -36,24 +39,31 @@ def setup_environment_and_seed(args, render_mode=None):
         max_zombies=4,
         render_mode=render_mode
     )) for _ in range(args.num_envs)]
+
+    # Create a vectorized environment for parallel execution
     train_envs = DummyVectorEnv(envs)
     train_envs.seed(args.seed)
     return train_envs
 
 
 def parse_arguments_and_initialize_envs() -> Tuple[argparse.Namespace, DummyVectorEnv]:
+    # Parse command-line arguments for configuring the environment and agents
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=1626)
+    # Epsilon-Greedy Exploration Strategy
     parser.add_argument('--test_eps', type=float, default=0.05)
+    # Epsilon-Greedy Exploration Strategy
     parser.add_argument('--train_eps', type=float, default=0.7)
+    # Off-Policy Training with Experience Replay
     parser.add_argument('--buffer_cap', type=int, default=50000)
-    parser.add_argument('--lr', type=float, default=3e-4)
+    parser.add_argument('--lr', type=float, default=30e-4)
     parser.add_argument('--gamma', type=float, default=0.9)
     parser.add_argument('--num_archers', type=int, default=2)
     parser.add_argument('--num_knights', type=int, default=2)
     parser.add_argument('--n_step', type=int, default=1)
+    # DQN Algorithm: Target network update frequency
     parser.add_argument('--target_update', type=int, default=100)
-    parser.add_argument('--epochs', type=int, default=20)
+    parser.add_argument('--epochs', type=int, default=2)
     parser.add_argument('--steps_per_epoch', type=int, default=2000)
     parser.add_argument('--collect_per_step', type=int, default=10)
     parser.add_argument('--updates_per_collect', type=float, default=0.5)
@@ -71,6 +81,7 @@ def parse_arguments_and_initialize_envs() -> Tuple[argparse.Namespace, DummyVect
     parser.add_argument('--device', type=str, default='cuda' if torch.cuda.is_available() else 'cpu')
     parser.add_argument('--num_envs', type=int, default=10, help="Total environments")
 
+    # Parse the arguments and initialize the environment
     args = parser.parse_args()
     train_envs = setup_environment_and_seed(args)
     return args, train_envs
@@ -80,6 +91,7 @@ def initialize_agents_and_envs(
         args: argparse.Namespace,
         envs: DummyVectorEnv
 ) -> Tuple[BasePolicy, List[torch.optim.Optimizer], List, List]:
+    # Extract observation and action space from the environment
     first_env = envs.workers[0].env
     observation_space = first_env.observation_space['observation'] if isinstance(
         first_env.observation_space, gym.spaces.Dict) else first_env.observation_space
@@ -88,6 +100,7 @@ def initialize_agents_and_envs(
 
     agents, optimizers, schedulers = [], [], []
 
+    # Initialize agents, optimizers, and schedulers for each knight and archer
     for _ in range(args.num_archers + args.num_knights):
         net = Net(
             args.state_shape,
@@ -95,42 +108,52 @@ def initialize_agents_and_envs(
             hidden_sizes=args.hidden_layers,
             device=args.device
         ).to(args.device)
+        # DQN Algorithm: Optimizing the Q-network
         optimizer = torch.optim.Adam(net.parameters(), lr=args.lr)
         scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.9)
         agent = DQNPolicy(
+            # DQN Algorithm: The Q-network
             net,
             optimizer,
             args.gamma,
             args.n_step,
+            # DQN Algorithm: Target network update frequency
             target_update_freq=args.target_update
         )
         agents.append(agent)
         optimizers.append(optimizer)
         schedulers.append(scheduler)
 
+    # Multi-Agent Policy Management: Manage multiple agents using MultiAgentPolicyManager
     policy = MultiAgentPolicyManager(agents, first_env)
     return policy, optimizers, first_env.env.agents, schedulers
 
 
 def setup_training_and_logger(args, policy, envs):
+    # Create a directory for logging data
     log_dir = os.path.join('data')
     os.makedirs(log_dir, exist_ok=True)
+
+    # Setup Tensorboard logger for visualizing training metrics
     writer = SummaryWriter(log_dir)
     writer.add_text("args", str(args))
     logger = TensorboardLogger(writer)
 
+    # Off-Policy Training with Experience Replay: Create a collector to gather experience during training
     collector = Collector(
         policy,
         envs,
-        VectorReplayBuffer(args.buffer_cap, len(envs)),
+        VectorReplayBuffer(args.buffer_cap, len(envs)),  # Off-Policy Training with Experience Replay: Replay buffer
         exploration_noise=True
     )
     return logger, collector
+
 
 def execute_training_loop(args, policy, optimizers, schedulers, logger, collector):
     rewards = []
     losses = []
 
+    # Adjust the learning rate and epsilon (for exploration) during training
     def adjust_learning_rate(epoch, env_step):
         for optimizer in optimizers:
             optimizer.step()
@@ -138,13 +161,16 @@ def execute_training_loop(args, policy, optimizers, schedulers, logger, collecto
             scheduler.step()
         for agent in policy.policies.values():
             epsilon = max(0.1, args.train_eps * (0.99 ** epoch))
+            # Epsilon-Greedy Exploration Strategy: Adjust epsilon for exploration
             agent.set_eps(epsilon)
 
+    # Evaluate the policy and log the results
     def evaluate_policy(epoch, env_step):
         for agent in policy.policies.values():
+            # Epsilon-Greedy Exploration Strategy: Use low epsilon during testing
             agent.set_eps(args.test_eps)
 
-        # Log rewards (average reward over test episodes)
+        # Collect test results and log average reward
         test_result = collector.collect(n_episode=args.test_envs)
         avg_reward = np.mean(test_result["rews"])
         rewards.append(avg_reward)
@@ -158,6 +184,7 @@ def execute_training_loop(args, policy, optimizers, schedulers, logger, collecto
             losses.append(loss)
             logger.writer.add_scalar(f'train/loss_agent_{agent_id}', loss, env_step)
 
+    # Off-Policy Training: Train the agents using off-policy learning
     result = offpolicy_trainer(
         policy,
         collector,
@@ -175,6 +202,7 @@ def execute_training_loop(args, policy, optimizers, schedulers, logger, collecto
         reward_metric=lambda rewards: rewards[:, 0]
     )
 
+    # Plot and save training results
     plot_results(rewards, losses)
 
     return result
@@ -217,6 +245,7 @@ def execute_kaz(args):
         policy, _, _, _ = initialize_agents_and_envs(args, env)
         policy.eval()
         for agent in policy.policies.values():
+            # Epsilon-Greedy Exploration Strategy: Set epsilon to a low value for testing
             agent.set_eps(args.test_eps)
         collector = Collector(policy, env, exploration_noise=True)
         result = collector.collect(n_episode=1, render=args.render_freq)
@@ -230,11 +259,13 @@ def execute_kaz(args):
         print(f"Reward: {result['rews'][:, 0].mean()}, Length: {result['lens'].mean()}")
         time.sleep(2)
     else:
+        # Parse arguments, initialize environments and agents, and start training
         args, envs = parse_arguments_and_initialize_envs()
         policy, optimizers, agents, schedulers = initialize_agents_and_envs(args, envs)
         logger, collector = setup_training_and_logger(args, policy, envs)
         result = execute_training_loop(args, policy, optimizers, schedulers, logger, collector)
         pprint.pprint(result)
+        # Check if the best reward meets the desired win rate
         assert result["best_reward"] >= args.win_rate
 
 
