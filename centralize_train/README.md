@@ -6,8 +6,9 @@ This repository contains code for training reinforcement learning (RL) agents to
 
 To set up the environment and run the code, you need the following Python packages:
 
-bash
+```bash
 pip install gym numpy torch pygame matplotlib tianshou pettingzoo
+```
 
 ## Running the Code
 
