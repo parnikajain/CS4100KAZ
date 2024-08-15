@@ -1,5 +1,6 @@
 # Knights Archers Zombies (KAZ) Centralized and Decentralized Training
 
+## Centralize Training
 
 ```bash
 pip install gym numpy torch pygame matplotlib tianshou pettingzoo
