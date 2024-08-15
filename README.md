@@ -6,14 +6,17 @@
 pip install gym numpy torch pygame matplotlib tianshou pettingzoo
 ```
 
+Training
 ```bash
 python KAZ_centralize_train.py
 ```
 
+Visulizatoin
 ```bash
 python KAZ_centralize_train.py --observe_only
 ```
 
+Data Viewing
 ```bash
 tensorboard --logdir=data
 ```
