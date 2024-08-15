@@ -1,15 +1,13 @@
-```markdown
-Knights Archers Zombies (KAZ) Centralized Training
+# Knights Archers Zombies (KAZ) Centralized Training
 
 This repository contains code for training reinforcement learning (RL) agents to play the "Knights Archers Zombies" game using centralized training with the Tianshou library and PettingZoo environment.
 
-Requirements
+### Requirements
 
 To set up the environment and run the code, you need the following Python packages:
 
 bash
 pip install gym numpy torch pygame matplotlib tianshou pettingzoo
-```
 
 ## Running the Code
 
