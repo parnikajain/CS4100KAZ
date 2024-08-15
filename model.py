@@ -13,7 +13,6 @@ import matplotlib.pyplot as plt
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'done'))
 
-
 class ReplayBuffer(object):
 
     def __init__(self, capacity):
@@ -77,8 +76,6 @@ class AgentDQN:
         self.steps_done += 1
         if sample > eps_threshold:
             with torch.no_grad():
-                # return random.randrange(0, 6)
-
                 return self.model(s).max(0).indices.item()
         else:
             return random.randrange(0, 6)
@@ -147,13 +144,26 @@ agent_models = {
 
 
 def train():
-    num_episodes = 100
     agent_list = [archer_0, archer_1, knight_0, knight_1]
-    batch_size = 64
+    checkpoint_path = 'trained_models/checkpoint.pth'
+    try:
+        checkpoint = torch.load(checkpoint_path)
+        for agent in agent_list:
+            agent.model.load_state_dict(checkpoint['model_state_dict'][agent.agent_name])
+            agent.optimizer.load_state_dict(checkpoint['optimizer_state_dict'][agent.agent_name])
+        start_episode = checkpoint['episode']
+        print(f"Resuming training from episode {start_episode}")
+    except FileNotFoundError:
+        print("Checkpoint not found")
+        start_episode = 0
+
+    num_episodes = 1000
+
+    batch_size = 128
     total_reward_vals = np.array([], dtype=int)
     last_observations = {agent: None for agent in agent_list}
     loss_vals = {agent_name: [] for agent_name in ['archer_0', 'archer_1', 'knight_0', 'knight_1']}
-    for ep in range(num_episodes):
+    for ep in range(start_episode, start_episode + num_episodes):
         env.reset(seed=42)
 
         total_reward = 0
@@ -201,6 +211,16 @@ def train():
         total_reward_vals = np.append(total_reward_vals, total_reward)
         print(f"Episode {ep + 1} finished with total reward: {total_reward}")
 
+        # Save a checkpoint every few episodes (e.g., every 1000 episodes)
+        if (ep + 1) % 1000 == 0:
+            checkpoint = {
+                'model_state_dict': {agent.agent_name: agent.model.state_dict() for agent in agent_list},
+                'optimizer_state_dict': {agent.agent_name: agent.optimizer.state_dict() for agent in agent_list},
+                'episode': ep + 1,
+            }
+            torch.save(checkpoint, 'trained_models/checkpoint.pth')
+            print(f"Checkpoint saved for episode {ep + 1}")
+
     env.close()
 
     archer_0.save_model('archer_0_model.pth')
@@ -223,7 +243,7 @@ def evaluate():
     knight_1.model.eval()
 
     total_reward_vals = np.array([], dtype=int)
-    num_episodes = 10
+    num_episodes = 100
 
     for ep in range(num_episodes):
         env.reset(seed=42)
@@ -255,6 +275,8 @@ def evaluate():
             if done:
                 break
 
+        total_reward_vals = np.append(total_reward_vals, total_reward)
+
     env.close()
 
     average_reward = np.mean(total_reward_vals)
@@ -263,16 +285,7 @@ def evaluate():
     return total_reward_vals
 
 
-def plot_metrics(training_rewards, training_losses, evaluation_rewards):
-    # Plot Training Rewards
-    plt.figure(figsize=(12, 6))
-    plt.plot(training_rewards, label="Training Reward")
-    plt.xlabel("Episode")
-    plt.ylabel("Total Reward")
-    plt.title("Total Reward per Episode During Training")
-    plt.legend()
-    plt.show()
-
+def plot_training_loss(training_losses):
     # Plot Training Loss for Each Agent
     for agent_name, losses in training_losses.items():
         plt.figure(figsize=(12, 6))
@@ -283,6 +296,19 @@ def plot_metrics(training_rewards, training_losses, evaluation_rewards):
         plt.legend()
         plt.show()
 
+
+def plot_training_rewards(training_rewards):
+    # Plot Training Rewards
+    plt.figure(figsize=(12, 6))
+    plt.plot(training_rewards, label="Training Reward")
+    plt.xlabel("Episode")
+    plt.ylabel("Total Reward")
+    plt.title("Total Reward per Episode During Training")
+    plt.legend()
+    plt.show()
+
+
+def plot_eval_rewards(evaluation_rewards):
     # Plot Evaluation Rewards
     plt.figure(figsize=(12, 6))
     plt.plot(evaluation_rewards, label="Evaluation Reward")
@@ -293,6 +319,9 @@ def plot_metrics(training_rewards, training_losses, evaluation_rewards):
     plt.show()
 
 
-training_rewards, training_losses = train()
+# training_rewards, training_losses = train()
+# plot_training_loss(training_losses)1
+# plot_training_rewards(training_rewards)
 evaluation_rewards = evaluate()
-plot_metrics(training_rewards, training_losses, evaluation_rewards)
+plot_eval_rewards(evaluation_rewards)
+
