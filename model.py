@@ -10,21 +10,27 @@ import torch.nn.functional as F
 import math
 import matplotlib.pyplot as plt
 
+# transition to store experiences in the replay buffer
 Transition = namedtuple('Transition',
                         ('state', 'action', 'next_state', 'reward', 'done'))
 
+
+# Replay Buffer to store and sample experience
 class ReplayBuffer(object):
 
     def __init__(self, capacity):
         self.memory = deque([], capacity)
 
     def push(self, *args):
+        # ddd a new experience to the memory
         self.memory.append(Transition(*args))
 
     def sample(self, batch_s):
+        # randomly sample a batch of experiences from the memory
         return random.sample(self.memory, batch_s)
 
     def __len__(self):
+        # return the current size of the memory
         return len(self.memory)
 
 
@@ -32,12 +38,14 @@ class ReplayBuffer(object):
 class DQN(nn.Module):
     def __init__(self, n_dimensions, n_actions):
         super(DQN, self).__init__()
+        # flatten the input dimensions for the first layer
         flatten = n_dimensions[0] * n_dimensions[1]
         self.layer1 = nn.Linear(flatten, 256)
         self.layer2 = nn.Linear(256, 256)
         self.layer3 = nn.Linear(256, n_actions)
 
     def forward(self, x):
+        # if np array convert to tensor for the NN
         if isinstance(x, np.ndarray):
             x = torch.tensor(x, dtype=torch.float32)
         x = x.view(-1)
@@ -53,6 +61,7 @@ num_agent_act = np.array([6, 6, 6, 6])
 class AgentDQN:
     def __init__(self, learning_rate, gamma, eps_start_val, eps_end_val, eps_decay, num_actions, observation_size,
                  agent_name, tau):
+        # initialize hyperparameter values, model, target network, and agent name
         self.learning_rate = learning_rate
         self.gamma = gamma
         self.eps_start_val = eps_start_val
@@ -67,7 +76,7 @@ class AgentDQN:
         self.agent_name = agent_name
         self.tau = tau
 
-    # if random returns random values between 0-5
+    # select an action based on epsilon-greedy policy
     def select_action(self, s):
 
         sample = random.random()
@@ -80,9 +89,11 @@ class AgentDQN:
         else:
             return random.randrange(0, 6)
 
+    # store the transition in the replay buffer
     def remember(self, s, a, r, new_s, d):
         self.memory.push(s, a, r, new_s, d)
 
+    # complete a training step using experiences from the replay buffer
     def replay(self, batch_size):
         if len(self.memory) < batch_size:
             return
@@ -90,6 +101,7 @@ class AgentDQN:
         for state, action, reward, next_state, done in minibatch:
             target = reward
             if not done:
+                # update the target value if the episode is not done
                 target += self.gamma * torch.max(self.target_net(next_state))
                 current_q_value = self.model(state)[action]
 
@@ -98,16 +110,20 @@ class AgentDQN:
                 loss.backward()
                 self.optimizer.step()
 
+        # update the target network with soft updates
         self.soft_update(self.model, self.target_net, self.tau)
         return loss.item()
 
+    # soft update for target network parameters
     def soft_update(self, policy_net, target_net, tau):
         for target_param, policy_param in zip(target_net.parameters(), policy_net.parameters()):
             target_param.data.copy_(tau * policy_param.data + (1.0 - tau) * target_param.data)
 
+    # save model into given filepath
     def save_model(self, filepath):
         torch.save(self.model.state_dict(), filepath)
 
+    # load trained model given the file path for continued training or testing
     def load_model(self, filepath):
         self.model.load_state_dict(torch.load(filepath))
         self.model.eval()
@@ -116,8 +132,10 @@ class AgentDQN:
 # define vectorized observation space where n is num_archers + num_knights + num_swords + max_arrows + max_zombies + 1
 observation_shape = (27, 5)
 
+# list of all agent names in the environment
 all_agents = ['archer_0', 'archer_1', 'knight_0', 'knight_1']
 
+# initialize the agents with the specified parameters
 archer_0 = AgentDQN(learning_rate=0.0001, gamma=0.99, eps_start_val=0.9, eps_end_val=0.05, eps_decay=1000,
                     num_actions=num_agent_act[0], observation_size=observation_shape, agent_name='archer_0', tau=0.005)
 
@@ -134,7 +152,7 @@ env = knights_archers_zombies_v10.env(render_mode="human", spawn_rate=20, num_ar
                                       max_arrows=10, killable_knights=True, killable_archers=True, pad_observation=True,
                                       line_death=True, max_cycles=900,
                                       vector_state=True, use_typemasks=False, sequence_space=False)
-
+# dictionary to store the models of all agents
 agent_models = {
     'archer_0': archer_0.model,
     'archer_1': archer_1.model,
@@ -143,10 +161,12 @@ agent_models = {
 }
 
 
+# function to train the agents
 def train():
     agent_list = [archer_0, archer_1, knight_0, knight_1]
     checkpoint_path = 'trained_models/checkpoint.pth'
     try:
+        # load from a checkpoint to resume training
         checkpoint = torch.load(checkpoint_path)
         for agent in agent_list:
             agent.model.load_state_dict(checkpoint['model_state_dict'][agent.agent_name])
@@ -154,11 +174,11 @@ def train():
         start_episode = checkpoint['episode']
         print(f"Resuming training from episode {start_episode}")
     except FileNotFoundError:
+        # if no checkpoint is found, start from scratch
         print("Checkpoint not found")
         start_episode = 0
 
     num_episodes = 1000
-
     batch_size = 128
     total_reward_vals = np.array([], dtype=int)
     last_observations = {agent: None for agent in agent_list}
@@ -168,6 +188,7 @@ def train():
 
         total_reward = 0
         done = False
+        # iterate over the agents in the episode
         while not done:
             for agent in env.agent_iter():
                 if agent == 'archer_0':
@@ -185,6 +206,7 @@ def train():
                     action = None
 
                 else:
+                    # epsilon greedy
                     action = agent.select_action(observation)
 
                 env.step(action)
@@ -196,6 +218,7 @@ def train():
                     total_reward += int(reward)
                     loss = agent.replay(batch_size)
 
+                    # add loss values to list to for visualization
                     if loss is not None:
                         loss_vals[agent.agent_name].append(loss)
 
@@ -205,13 +228,14 @@ def train():
                 env.reset()
                 break
 
+        # complete soft update for each agent's target network
         for agent in agent_list:
             agent.soft_update(agent.model, agent.target_net, agent.tau)
 
         total_reward_vals = np.append(total_reward_vals, total_reward)
         print(f"Episode {ep + 1} finished with total reward: {total_reward}")
 
-        # Save a checkpoint every few episodes (e.g., every 1000 episodes)
+        # save a checkpoint every few episodes (e.g., every 1000 episodes)
         if (ep + 1) % 1000 == 0:
             checkpoint = {
                 'model_state_dict': {agent.agent_name: agent.model.state_dict() for agent in agent_list},
@@ -223,6 +247,7 @@ def train():
 
     env.close()
 
+    # save model
     archer_0.save_model('archer_0_model.pth')
     archer_1.save_model('archer_1_model.pth')
     knight_0.save_model('knight_0_model.pth')
@@ -231,12 +256,15 @@ def train():
     return total_reward_vals, loss_vals
 
 
+# function to evaluate the performance of trained agents
 def evaluate():
+    #  load the saved models for evaluation
     archer_0.load_model('archer_0_model.pth')
     archer_1.load_model('archer_1_model.pth')
     knight_0.load_model('knight_0_model.pth')
     knight_1.load_model('knight_1_model.pth')
 
+    # set the models to evaluation mode
     archer_0.model.eval()
     archer_1.model.eval()
     knight_0.model.eval()
@@ -279,12 +307,14 @@ def evaluate():
 
     env.close()
 
+    # get the average reward over all evaluation episodes and print
     average_reward = np.mean(total_reward_vals)
     print(f"Average reward over {num_episodes} evaluation episodes: {average_reward}")
 
     return total_reward_vals
 
 
+# plot the training losses for each agent
 def plot_training_loss(training_losses):
     # Plot Training Loss for Each Agent
     for agent_name, losses in training_losses.items():
@@ -297,6 +327,7 @@ def plot_training_loss(training_losses):
         plt.show()
 
 
+# plot the total rewards per episode during training
 def plot_training_rewards(training_rewards):
     # Plot Training Rewards
     plt.figure(figsize=(12, 6))
@@ -308,6 +339,7 @@ def plot_training_rewards(training_rewards):
     plt.show()
 
 
+# plot the total rewards per episode during evaluation
 def plot_eval_rewards(evaluation_rewards):
     # Plot Evaluation Rewards
     plt.figure(figsize=(12, 6))
@@ -319,9 +351,14 @@ def plot_eval_rewards(evaluation_rewards):
     plt.show()
 
 
-# training_rewards, training_losses = train()
-# plot_training_loss(training_losses)1
-# plot_training_rewards(training_rewards)
-evaluation_rewards = evaluate()
-plot_eval_rewards(evaluation_rewards)
+# main function to complete the training, evaluation, and plotting
+def main():
+    training_rewards, training_losses = train()
+    plot_training_loss(training_losses)
+    plot_training_rewards(training_rewards)
+    evaluation_rewards = evaluate()
+    plot_eval_rewards(evaluation_rewards)
 
+
+if __name__ == "__main__":
+    main()
