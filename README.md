@@ -1,5 +1,5 @@
 # CS4100 Knights Archers Zombies (KAZ) Centralized and Decentralized Training
-
+Knights Archers Zombies is a game provided by the ButterFly enviroment in Petting Zoo. The game consists of archers and knights fighting off zombies that are coming in waves. Petting Zoo in general offers a variety of multi-agent enviroments to train and test different Reinforcement Learning algorithms. Our goal was to implement Decentralized and Centralized training to the archers and knights in hope to see optimal performance.
 ## Centralize Training
 
 ```bash
