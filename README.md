@@ -12,7 +12,7 @@ If you are new to Reinforcement Learning or would like some clarification regard
 - [QMIX Research Paper](https://arxiv.org/pdf/1803.11485)
 - [Article on Centralized Training and Decentralized Execetion in MARL](https://blog.devops.dev/centralised-training-and-decentralised-execution-in-multi-agent-reinforcement-learning-e68535a05307)
 
-## Installations
+## Installations 
 Before you decide to train or execute the pre-trained models, you need to install the necessary dependencies. Also, Petting Zoo states that only Python 3.8-3.11 is supported on macOS and Linux so make sure you update your Python version if you haven't!
 
 ```bash
@@ -25,27 +25,33 @@ pip install numpy matplotlib torch tianshou pettingzoo['butterfly']
 - pettingzoo: Petting zoo's Butterfly enviroment with multi-agent games for cooperative and competitive scenarios.
 
 ## Decentralized Training
+### Github Clone
+First, clone the repo
+```bash
+git clone https://github.com/parnikajain/CS4100KAZ.git
+```
+
+Next, move into the project directory
+```bash
+cd CS4100KAZ
+```
+
 ### Training
-To start training in a centralized setting, run the following command:
+To continue to train our premodel in a decentralized setting, run the following command:
 
 ```bash
-python KAZ_centralize_train.py
+python model.py --mode train
 ```
 
-### Visualization
-To observe the agents' performance during Centralized training:
+Note, that after training, a visualization of the loss and training rewards will show up. 
+
+### Evaluation
+To evaluate the trained model, you can run the following command:
 
 ```bash
-python KAZ_centralize_train.py --observe_only
+python model.py --mode eval
 ```
-
-### Data Viewing
-You can monitor the training progress and metrics using TensorBoard:
-
-```bash
-tensorboard --logdir=data
-```
-
+Note, that after evaluation, a visualization of the total rewards will show up along with the average reward in the console.
 
 ## Centralized Training
 ### Training
