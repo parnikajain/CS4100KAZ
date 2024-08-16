@@ -165,7 +165,7 @@ agent_models = {
 # function to train the agents
 def train():
     agent_list = [archer_0, archer_1, knight_0, knight_1]
-    checkpoint_path = 'trained_models/checkpoint.pth'
+    checkpoint_path = 'checkpoint.pth'
     try:
         # load from a checkpoint to resume training
         checkpoint = torch.load(checkpoint_path)
@@ -243,7 +243,7 @@ def train():
                 'optimizer_state_dict': {agent.agent_name: agent.optimizer.state_dict() for agent in agent_list},
                 'episode': ep + 1,
             }
-            torch.save(checkpoint, 'trained_models/checkpoint.pth')
+            torch.save(checkpoint, 'checkpoint.pth')
             print(f"Checkpoint saved for episode {ep + 1}")
 
     env.close()
@@ -260,10 +260,10 @@ def train():
 # function to evaluate the performance of trained agents
 def evaluate():
     #  load the saved models for evaluation
-    archer_0.load_model('trained_models/archer_0_model.pth')
-    archer_1.load_model('trained_models/archer_1_model.pth')
-    knight_0.load_model('trained_models/knight_0_model.pth')
-    knight_1.load_model('trained_models/knight_0_model.pth')
+    archer_0.load_model('Decentralized Training/archer_0_model.pth')
+    archer_1.load_model('Decentralized Training/archer_1_model.pth')
+    knight_0.load_model('Decentralized Training/knight_0_model.pth')
+    knight_1.load_model('Decentralized Training/knight_0_model.pth')
 
     # set the models to evaluation mode
     archer_0.model.eval()
