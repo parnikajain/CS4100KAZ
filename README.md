@@ -18,20 +18,36 @@ Before you decide to train or execute the pre-trained models, you need to instal
 ```bash
 pip install numpy matplotlib torch tianshou pettingzoo['butterfly']
 ```
-- numpy: large, multi-dimensional arrays and matrices
-- matplotlib: data visualizations
+- numpy: Large, multi-dimensional arrays and matrices
+- matplotlib: Data visualizations for reward and loss plots
 - pytorch: Deep learning library for building and training neural networks.
 - tianshou: Reinforcement learning library with various algorithms and tools.
 - pettingzoo: Petting zoo's Butterfly enviroment with multi-agent games for cooperative and competitive scenarios.
 
+## Decentralized Training
+### Training
+To start training in a centralized setting, run the following command:
 
-## Centralized Training
-### Installation
-First, install the necessary dependencies:
 ```bash
-pip install gym numpy torch pygame matplotlib tianshou pettingzoo
+python KAZ_centralize_train.py
 ```
 
+### Visualization
+To observe the agents' performance during Centralized training:
+
+```bash
+python KAZ_centralize_train.py --observe_only
+```
+
+### Data Viewing
+You can monitor the training progress and metrics using TensorBoard:
+
+```bash
+tensorboard --logdir=data
+```
+
+
+## Centralized Training
 ### Training
 To start training in a centralized setting, run the following command:
 
