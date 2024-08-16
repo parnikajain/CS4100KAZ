@@ -12,6 +12,18 @@ If you are new to Reinforcement Learning or would like some clarification regard
 - [QMIX Research Paper](https://arxiv.org/pdf/1803.11485)
 - [Article on Centralized Training and Decentralized Execetion in MARL](https://blog.devops.dev/centralised-training-and-decentralised-execution-in-multi-agent-reinforcement-learning-e68535a05307)
 
+## Installations
+Before you decide to train or execute the pre-trained models, you need to install the necessary dependencies. Also, Petting Zoo states that only Python 3.8-3.11 is supported on macOS and Linux so make sure you update your Python version if you haven't!
+
+```bash
+pip install numpy matplotlib torch tianshou pettingzoo['butterfly']
+```
+- numpy: large, multi-dimensional arrays and matrices
+- matplotlib: data visualizations
+- pytorch: Deep learning library for building and training neural networks.
+- tianshou: Reinforcement learning library with various algorithms and tools.
+- pettingzoo: Petting zoo's Butterfly enviroment with multi-agent games for cooperative and competitive scenarios.
+
 
 ## Centralized Training
 ### Installation
