@@ -20,9 +20,9 @@ pip install numpy matplotlib torch tianshou pettingzoo['butterfly']
 ```
 - numpy: Large, multi-dimensional arrays and matrices
 - matplotlib: Data visualizations for reward and loss plots
-- pytorch: Deep learning library for building and training neural networks.
-- tianshou: Reinforcement learning library with various algorithms and tools.
-- pettingzoo: Petting zoo's Butterfly enviroment with multi-agent games for cooperative and competitive scenarios.
+- pytorch: Deep learning library for building and training neural networks
+- tianshou: Reinforcement learning library with various algorithms and tools
+- pettingzoo: Petting zoo's Butterfly enviroment with multi-agent games for cooperative and competitive scenarios
 
 ## Decentralized Training
 ### Github Clone
@@ -31,9 +31,10 @@ First, clone the repo
 git clone https://github.com/parnikajain/CS4100KAZ.git
 ```
 
-Next, move into the project directory
+Next, move into the project directory and into the Decentralized_Training directory to access the model
 ```bash
 cd CS4100KAZ
+cd Decentralized_Training
 ```
 
 ### Training
