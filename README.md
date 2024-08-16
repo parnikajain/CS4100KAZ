@@ -43,15 +43,15 @@ To continue to train our premodel in a decentralized setting, run the following 
 python model.py --mode train
 ```
 
-Note, that after training, a visualization of the loss and training rewards will show up. 
-
 ### Evaluation
 To evaluate the trained model, you can run the following command:
 
 ```bash
 python model.py --mode eval
 ```
-Note, that after evaluation, a visualization of the total rewards will show up along with the average reward in the console.
+### Notes:
+- After training, a visualization of the loss and training rewards will show up
+- After evaluation, a visualization of the total rewards will show up along with the average reward in the console.
 
 ## Centralized Training
 ### Training
