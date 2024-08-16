@@ -5,6 +5,13 @@ Knights Archers Zombies is a game provided by the ButterFly enviroment in Pettin
 
 [Petting Zoo](https://pettingzoo.farama.org/content/basic_usage/) in general offers a variety of multi-agent enviroments to train and test different Reinforcement Learning algorithms. Our goal was to implement Decentralized and Centralized training to the archers and knights in hope to see optimal performance. For Decentralized Training, we implemented Deep Q Networks where each agent updates its own policy without considering the behavior of the other agents in the enviroment. On the other hand, for Centralized Training, we implemented a traditional MLP neural network architecture with action pooling which allowed all agents to share information and coordinate their actions during training, updating a joint policy that considers the behavior of all agents in the environment. 
 
+## Resources
+If you are new to Reinforcement Learning or would like some clarification regarding our implementation, no problem! Here we have a list of resources that we found useful for our implementation of Decentralized and Centralized Training in a Multi-Agent Enviroment.
+
+- [Intro to RL and Q network tutorial](https://www.tensorflow.org/agents/tutorials/0_intro_rl)
+- [QMIX Research Paper](https://arxiv.org/pdf/1803.11485)
+- [Article on Centralized Training and Decentralized Execetion in MARL](https://blog.devops.dev/centralised-training-and-decentralised-execution-in-multi-agent-reinforcement-learning-e68535a05307)
+
 
 ## Centralized Training
 ### Installation
