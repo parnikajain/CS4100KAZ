@@ -1,3 +1,4 @@
+import argparse
 from collections import deque, namedtuple
 import random
 
@@ -259,10 +260,10 @@ def train():
 # function to evaluate the performance of trained agents
 def evaluate():
     #  load the saved models for evaluation
-    archer_0.load_model('archer_0_model.pth')
-    archer_1.load_model('archer_1_model.pth')
-    knight_0.load_model('knight_0_model.pth')
-    knight_1.load_model('knight_1_model.pth')
+    archer_0.load_model('trained_models/archer_0_model.pth')
+    archer_1.load_model('trained_models/archer_1_model.pth')
+    knight_0.load_model('trained_models/knight_0_model.pth')
+    knight_1.load_model('trained_models/knight_0_model.pth')
 
     # set the models to evaluation mode
     archer_0.model.eval()
@@ -353,11 +354,21 @@ def plot_eval_rewards(evaluation_rewards):
 
 # main function to complete the training, evaluation, and plotting
 def main():
-    training_rewards, training_losses = train()
-    plot_training_loss(training_losses)
-    plot_training_rewards(training_rewards)
-    evaluation_rewards = evaluate()
-    plot_eval_rewards(evaluation_rewards)
+    parser = argparse.ArgumentParser(description="DQN Training, Evaluation, with Plotting")
+    parser.add_argument('--mode', type=str, required=True, choices=['train', 'eval', 'plot'],
+                        help="Mode to run: 'train', 'eval', or 'plot'")
+
+    args = parser.parse_args()
+
+    if args.mode == 'train':
+        training_rewards, training_losses = train()
+        plot_training_loss(training_losses)
+        plot_training_rewards(training_rewards)
+    elif args.mode == 'eval':
+        evaluation_rewards = evaluate()
+        plot_eval_rewards(evaluation_rewards)
+    else:
+        print("Please specify a valid mode.")
 
 
 if __name__ == "__main__":
