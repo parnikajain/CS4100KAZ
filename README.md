@@ -49,7 +49,7 @@ To evaluate the trained model, you can run the following command:
 ```bash
 python model.py --mode eval
 ```
-### Notes:
+### Notes
 - After training, a visualization of the loss and training rewards will show up
 - After evaluation, a visualization of the total rewards will show up along with the average reward in the console.
 
