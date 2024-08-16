@@ -11,7 +11,7 @@ pip install gym numpy torch pygame matplotlib tianshou pettingzoo
 To start training in a decentralized setting, run the following command:
 
 ```bash
-python KAZ_decentralize_train.py
+python KAZ_centralize_train.py
 ```
 
 ### Visualization
