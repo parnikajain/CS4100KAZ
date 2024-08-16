@@ -15,10 +15,10 @@ python KAZ_decentralize_train.py
 ```
 
 ### Visualization
-To observe the agents' performance during decentralized training:
+To observe the agents' performance during Centralized training:
 
 ```bash
-python KAZ_decentralize_train.py --observe_only
+python KAZ_centralize_train.py --observe_only
 ```
 
 ### Data Viewing
@@ -30,4 +30,4 @@ tensorboard --logdir=data
 
 ### Notes
 - **Visualization**: The `--observe_only` flag lets you watch the trained agents in action without further training, providing insight into their learned behaviors.
-- **TensorBoard**: Use TensorBoard for a detailed view of training metrics, such as loss curves and reward progress, to evaluate the effectiveness of decentralized training.
+- **TensorBoard**: Use TensorBoard for a detailed view of training metrics, such as loss curves and reward progress, to evaluate the effectiveness of centralized training.
