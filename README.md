@@ -18,8 +18,8 @@ Before you decide to train or execute the pre-trained models, you need to instal
 ```bash
 pip install numpy matplotlib torch tianshou pettingzoo['butterfly']
 ```
-- numpy: large, multi-dimensional arrays and matrices
-- matplotlib: data visualizations
+- numpy: Large, multi-dimensional arrays and matrices
+- matplotlib: Data visualizations for reward and loss plots
 - pytorch: Deep learning library for building and training neural networks.
 - tianshou: Reinforcement learning library with various algorithms and tools.
 - pettingzoo: Petting zoo's Butterfly enviroment with multi-agent games for cooperative and competitive scenarios.
